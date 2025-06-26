@@ -1,0 +1,84 @@
+# nginx proxy address - http://172.17.0.1:59070
+
+name: matomo
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+services:
+  app:
+    image: docker.io/bitnami/matomo:latest
+    container_name: matomo-app
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      - MATOMO_DEFAULT_DATABASE_HOST=matomo-db
+      - MATOMO_DATABASE_HOST=matomo-db
+      - MATOMO_DATABASE_USER=matomo
+      - MATOMO_DATABASE_NAME=matomo
+      - MATOMO_DATABASE_PORT_NUMBER=3306
+      - MATOMO_PROXY_HOST_HEADER=HTTP_X_FORWARDED_HOST
+      - MATOMO_PROXY_CLIENT_HEADER=HTTP_X_FORWARDED_FOR
+      - MATOMO_ENABLE_ASSUME_SECURE_PROTOCOL=yes
+      - MATOMO_ENABLE_FORCE_SSL=yes
+      - MATOMO_ENABLE_PROXY_URI_HEADER=yes
+      - MATOMO_USERNAME=${APP_ADMIN_USER:-administrator}
+      - MATOMO_PASSWORD=${APP_ADMIN_PASS:-ISeV4d2fGBkS7YFl}
+      - MATOMO_EMAIL=administrator@${BASE_DOMAIN_NAME:-$HOSTNAME}
+      - MATOMO_HOST=${BASE_HOST_NAME:-$HOSTNAME}
+      - MATOMO_WEBSITE_NAME=${APP_ORG_NAME}
+      - MATOMO_ENABLE_TRUSTED_HOST_CHECK=no
+      - MATOMO_SMTP_HOST=${EMAIL_SERVER_HOST}
+      - MATOMO_SMTP_PORT_NUMBER=${EMAIL_SERVER_PORT}
+      - MATOMO_NOREPLY_NAME=${APP_ORG_NAME}
+      - MATOMO_NOREPLY_ADDRESS=no-reply@${BASE_HOST_NAME:-$HOSTNAME}
+      - ALLOW_EMPTY_PASSWORD=yes
+    ports:
+      - '172.17.0.1:59070:8080'
+    volumes:
+      - './rootfs/data/matomo:/bitnami/matomo'
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - matomo
+
+  db:
+    image: docker.io/bitnami/mariadb:latest
+    container_name: matomo-db
+    hostname: matomo-db
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      - MARIADB_USER=matomo
+      - MARIADB_DATABASE=matomo
+      - ALLOW_EMPTY_PASSWORD=yes
+      - 'MARIADB_EXTRA_FLAGS=--max_allowed_packet=2048MB'
+    volumes:
+      - './rootfs/db/mariadb:/bitnami/mariadb'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'healthcheck.sh',
+          '--su-mysql',
+          '--connect',
+          '--innodb_initialized',
+        ]
+      start_period: 1m
+      start_interval: 10s
+      interval: 1m
+      timeout: 5s
+      retries: 3
+    networks:
+      - matomo
+
+networks:
+  matomo:
+    name: matomo
+    external: false
