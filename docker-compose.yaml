@@ -62,7 +62,7 @@ services:
       ALLOW_EMPTY_PASSWORD: yes
       MARIADB_EXTRA_FLAGS: --max_allowed_packet=2048MB
     volumes:
-      - './rootfs/db/mariadb/matomo:/bitnami/mariadb'
+      - './rootfs/data/db/mariadb/matomo:/bitnami/mariadb'
     healthcheck:
       test:
         [
