@@ -60,8 +60,8 @@ See `docker-compose.yaml` for complete list of configurable options.
 
 ## 📂 Volumes
 
-- `./rootfs/data/matomo` - Data storage
-- `./rootfs/data/db/mariadb/matomo` - Data storage
+- `./volumes/data/matomo` - Data storage
+- `./volumes/data/db/mariadb/matomo` - Data storage
 
 ## 🔐 Security
 
