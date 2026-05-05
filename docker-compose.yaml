@@ -41,7 +41,7 @@ services:
     ports:
       - '172.17.0.1:59070:8080'
     volumes:
-      - './rootfs/data/matomo:/bitnami/matomo'
+      - './volumes/data/matomo:/bitnami/matomo'
     depends_on:
       db:
         condition: service_healthy
@@ -62,7 +62,7 @@ services:
       ALLOW_EMPTY_PASSWORD: yes
       MARIADB_EXTRA_FLAGS: --max_allowed_packet=2048MB
     volumes:
-      - './rootfs/data/db/mariadb/matomo:/bitnami/mariadb'
+      - './volumes/data/db/mariadb/matomo:/bitnami/mariadb'
     healthcheck:
       test:
         [
