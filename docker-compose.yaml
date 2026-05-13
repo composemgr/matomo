@@ -1,4 +1,5 @@
 # nginx proxy address - http://172.17.0.1:59070
+# NOTE: switched from bitnami/matomo (commercial as of Aug 2025) to official matomo image
 
 name: matomo
 x-logging: &default-logging
@@ -9,7 +10,7 @@ x-logging: &default-logging
 
 services:
   app:
-    image: bitnami/matomo:latest
+    image: matomo:latest
     container_name: matomo-app
     hostname: ${BASE_HOST_NAME:-$HOSTNAME}
     restart: always
@@ -19,31 +20,17 @@ services:
       TZ: ${TZ:-America/New_York}
       CONTAINER_NAME: matomo-app
       HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
-      MATOMO_DEFAULT_DATABASE_HOST: matomo-db
       MATOMO_DATABASE_HOST: matomo-db
-      MATOMO_DATABASE_USER: ${DB_USER_NAME:-matomo}
+      MATOMO_DATABASE_USERNAME: ${DB_USER_NAME:-matomo}
       MATOMO_DATABASE_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
-      MATOMO_DATABASE_NAME: ${DB_CREATE_DATABASE_NAME:-matomo}
-      MATOMO_DATABASE_PORT_NUMBER: 3306
-      MATOMO_PROXY_HOST_HEADER: HTTP_X_FORWARDED_HOST
-      MATOMO_PROXY_CLIENT_HEADER: HTTP_X_FORWARDED_FOR
-      MATOMO_ENABLE_ASSUME_SECURE_PROTOCOL: yes
-      MATOMO_ENABLE_FORCE_SSL: yes
-      MATOMO_ENABLE_PROXY_URI_HEADER: yes
-      MATOMO_USERNAME: ${APP_ADMIN_USER:-administrator}
-      MATOMO_PASSWORD: ${APP_ADMIN_PASS:-changeme_admin_password}
-      MATOMO_EMAIL: ${APP_ADMIN_USER:-administrator}@${BASE_DOMAIN_NAME:-example.com}
-      MATOMO_HOST: ${BASE_HOST_NAME:-$HOSTNAME}
-      MATOMO_WEBSITE_NAME: ${APP_ORG_NAME:-My Site}
-      MATOMO_ENABLE_TRUSTED_HOST_CHECK: no
-      MATOMO_SMTP_HOST: ${EMAIL_SERVER_HOST:-172.17.0.1}
-      MATOMO_SMTP_PORT_NUMBER: ${EMAIL_SERVER_PORT:-587}
-      MATOMO_NOREPLY_NAME: ${EMAIL_SERVER_FROM_ORG:-Matomo}
-      MATOMO_NOREPLY_ADDRESS: ${EMAIL_SERVER_MAIL_FROM:-no-reply@example.com}
+      MATOMO_DATABASE_DBNAME: ${DB_CREATE_DATABASE_NAME:-matomo}
+      MATOMO_DATABASE_ADAPTER: mysql
+      MATOMO_DATABASE_TABLES_PREFIX: matomo_
+      PHP_MEMORY_LIMIT: 512M
     ports:
-      - '172.17.0.1:59070:8080'
+      - '172.17.0.1:59070:80'
     volumes:
-      - './volumes/data/matomo:/bitnami/matomo'
+      - './volumes/data/matomo:/var/www/html'
     depends_on:
       db:
         condition: service_healthy
@@ -55,7 +42,7 @@ services:
       - 'traefik.enable=true'
       - 'cloudflare.enable=true'
       - 'traefik.docker.network=proxy'
-      - 'cloudflare.service=http://matomo-app:8080'
+      - 'cloudflare.service=http://matomo-app:80'
       - 'cloudflare.hostname=matomo.${CLOUDFLARE_ZONE_NAME:-}'
       - 'traefik.http.routers.matomo-app.entrypoints=http'
       - 'traefik.http.routers.matomo-app-secure.tls=true'
@@ -66,10 +53,10 @@ services:
       - 'traefik.http.routers.matomo-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
       - 'traefik.http.routers.matomo-app-secure.tls.certresolver=cloudflare'
       - 'traefik.http.routers.matomo-app-secure.service=matomo-app'
-      - 'traefik.http.services.matomo-app.loadbalancer.server.port=8080'
+      - 'traefik.http.services.matomo-app.loadbalancer.server.port=80'
 
   db:
-    image: bitnami/mariadb:latest
+    image: mariadb:latest
     container_name: matomo-db
     hostname: matomo-db
     restart: always
@@ -84,7 +71,7 @@ services:
       MARIADB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-changeme_admin_password}
       MARIADB_EXTRA_FLAGS: --max_allowed_packet=2048MB
     volumes:
-      - './volumes/data/db/mariadb/matomo:/bitnami/mariadb'
+      - './volumes/data/db/mariadb/matomo:/var/lib/mysql'
     healthcheck:
       test:
         [
