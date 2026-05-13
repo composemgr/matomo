@@ -17,6 +17,8 @@ services:
     logging: *default-logging
     environment:
       TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: matomo-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
       MATOMO_DEFAULT_DATABASE_HOST: matomo-db
       MATOMO_DATABASE_HOST: matomo-db
       MATOMO_DATABASE_USER: ${DB_USER_NAME:-matomo}
@@ -47,6 +49,24 @@ services:
         condition: service_healthy
     networks:
       - matomo
+      - proxy
+      - cloudflare
+    labels:
+      - 'traefik.enable=true'
+      - 'cloudflare.enable=true'
+      - 'traefik.docker.network=proxy'
+      - 'cloudflare.service=http://matomo-app:8080'
+      - 'cloudflare.hostname=matomo.${CLOUDFLARE_ZONE_NAME:-}'
+      - 'traefik.http.routers.matomo-app.entrypoints=http'
+      - 'traefik.http.routers.matomo-app-secure.tls=true'
+      - 'traefik.http.routers.matomo-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.middlewares.matomo-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.matomo-app.middlewares=matomo-app-https-redirect'
+      - 'traefik.http.routers.matomo-app-secure.entrypoints=https'
+      - 'traefik.http.routers.matomo-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.routers.matomo-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.matomo-app-secure.service=matomo-app'
+      - 'traefik.http.services.matomo-app.loadbalancer.server.port=8080'
 
   db:
     image: bitnami/mariadb:latest
@@ -57,6 +77,7 @@ services:
     logging: *default-logging
     environment:
       TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: matomo-db
       MARIADB_USER: ${DB_USER_NAME:-matomo}
       MARIADB_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
       MARIADB_DATABASE: ${DB_CREATE_DATABASE_NAME:-matomo}
@@ -85,3 +106,7 @@ networks:
   matomo:
     name: matomo
     external: false
+  proxy:
+    external: true
+  cloudflare:
+    external: true
