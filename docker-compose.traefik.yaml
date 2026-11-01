@@ -1,0 +1,83 @@
+# nginx proxy address - http://172.17.0.1:64247
+name: matomo
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+services:
+  app:
+    image: matomo:latest
+    container_name: matomo-app
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: matomo-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+      MATOMO_DATABASE_HOST: matomo-db
+      MATOMO_DATABASE_USERNAME: ${DB_USER_NAME:-matomo}
+      MATOMO_DATABASE_PASSWORD: ${DB_USER_PASS:-replace-with-a-random-password}
+      MATOMO_DATABASE_DBNAME: ${DB_CREATE_DATABASE_NAME:-matomo}
+      MATOMO_DATABASE_ADAPTER: mysql
+      MATOMO_DATABASE_TABLES_PREFIX: matomo_
+      PHP_MEMORY_LIMIT: 512M
+    volumes:
+      - './volumes/data/matomo:/var/www/html'
+    depends_on:
+      db:
+        condition: service_healthy
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.docker.network=traefik'
+      - 'traefik.http.routers.matomo-app.entrypoints=http'
+      - 'traefik.http.routers.matomo-app.rule=Host(`${BASE_HOST_NAME:-$HOSTNAME}`)'
+      - 'traefik.http.routers.matomo-app.middlewares=matomo-app-https-redirect'
+      - 'traefik.http.middlewares.matomo-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.matomo-app-secure.entrypoints=https'
+      - 'traefik.http.routers.matomo-app-secure.rule=Host(`${BASE_HOST_NAME:-$HOSTNAME}`)'
+      - 'traefik.http.routers.matomo-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.matomo-app-secure.service=matomo-app'
+      - 'traefik.http.services.matomo-app.loadbalancer.server.port=80'
+    networks:
+      - matomo
+      - traefik
+
+  db:
+    image: mariadb:latest
+    container_name: matomo-db
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: matomo-db
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: matomo-db
+      MARIADB_USER: ${DB_USER_NAME:-matomo}
+      MARIADB_PASSWORD: ${DB_USER_PASS:-replace-with-a-random-password}
+      MARIADB_DATABASE: ${DB_CREATE_DATABASE_NAME:-matomo}
+      MARIADB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-replace-with-a-random-password}
+      MARIADB_EXTRA_FLAGS: --max_allowed_packet=2048MB
+    volumes:
+      - './volumes/db/mariadb/matomo:/var/lib/mysql:z'
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--su-mysql', '--connect', '--innodb_initialized']
+      start_period: 1m
+      start_interval: 10s
+      interval: 1m
+      timeout: 5s
+      retries: 3
+    networks:
+      - matomo
+
+networks:
+  matomo:
+    name: matomo
+    external: false
+  traefik:
+    external: true
